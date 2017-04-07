@@ -103,11 +103,11 @@ LinkQueue::LinkQueue( const string & link_name, const string & filename, const s
     }
 }
 
-void LinkQueue::record_arrival( const uint64_t arrival_time, const size_t pkt_size )
+void LinkQueue::record_arrival( const uint64_t arrival_time, const size_t pkt_size, uint16_t src, uint16_t dst )
 {
     /* log it */
     if ( log_ ) {
-        *log_ << arrival_time << " + " << pkt_size << endl;
+        *log_ << arrival_time << " + " << pkt_size << " " << src << ":" << dst << endl;
     }
 
     /* meter it */
@@ -118,10 +118,10 @@ void LinkQueue::record_arrival( const uint64_t arrival_time, const size_t pkt_si
 
 void LinkQueue::record_departure_opportunity( void )
 {
-    /* log the delivery opportunity */
-    if ( log_ ) {
-        *log_ << next_delivery_time() << " # " << PACKET_SIZE << endl;
-    }
+    /* log the delivery opportunity */ 
+    //if ( log_ ) {
+    //    *log_ << next_delivery_time() << " # " << PACKET_SIZE << endl;
+    //}
 
     /* meter the delivery opportunity */
     if ( throughput_graph_ ) {
@@ -133,8 +133,11 @@ void LinkQueue::record_departure( const uint64_t departure_time, const QueuedPac
 {
     /* log the delivery */
     if ( log_ ) {
-        *log_ << departure_time << " - " << packet.contents.size()
-              << " " << departure_time - packet.arrival_time << endl;
+			uint16_t src, dst;
+			_parse_ports((const unsigned char *) packet.contents.substr(24,4).c_str(), &src, &dst);
+			*log_ << departure_time << " - " << packet.contents.size()
+						<< " " << departure_time - packet.arrival_time << " "
+						<< src << ":" << dst << endl;
     }
 
     /* meter the delivery */
@@ -157,7 +160,13 @@ void LinkQueue::read_packet( const string & contents )
 
     rationalize( now );
 
-    record_arrival( now, contents.size());
+		uint16_t src = 0,
+						 dst = 0;
+		if ( log_ ) {
+			_parse_ports((const unsigned char *) contents.substr(24,4).c_str(), &src, &dst);
+		}
+    record_arrival( now, contents.size(), src, dst);
+
     packet_queue_->enqueue( QueuedPacket( contents, now ) );
 }
 

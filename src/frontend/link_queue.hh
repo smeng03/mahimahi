@@ -13,6 +13,11 @@
 #include "binned_livegraph.hh"
 #include "abstract_packet_queue.hh"
 
+inline void _parse_ports( const unsigned char *s, uint16_t *src, uint16_t *dst ) {
+	*src = (s[0] << 8) | s[1];
+	*dst = (s[2] << 8) | s[3];
+}
+
 class LinkQueue
 {
 private:
@@ -38,7 +43,7 @@ private:
 
     void use_a_delivery_opportunity( void );
 
-    void record_arrival( const uint64_t arrival_time, const size_t pkt_size );
+    void record_arrival( const uint64_t arrival_time, const size_t pkt_size, uint16_t src, uint16_t dst );
     void record_departure_opportunity( void );
     void record_departure( const uint64_t departure_time, const QueuedPacket & packet );
 
