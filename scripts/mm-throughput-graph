@@ -53,7 +53,7 @@ LINE: while ( <> ) {
   }
 
   # parse and validate line
-  my ( $timestamp, $event_type, $num_bytes, $delay ) = split /\s+/, $_;
+  my ( $timestamp, $event_type, $num_bytes, $delay, $flow, $qbytes, $qpkts ) = split /\s+/, $_;
 
   if ( not defined $num_bytes ) {
     die q{Format: timestamp event_type num_bytes [delay]};
@@ -196,7 +196,8 @@ set xlabel "time (s)"
 set ylabel "throughput (Mbits/s)"
 set key center outside top horizontal
 set style fill solid 0.2 noborder
-set terminal svg size 1024,560 fixed  fname 'Arial'  fsize 12 rounded solid mouse standalone name "Throughput"
+set terminal postscript eps enhanced color solid rounded font 'Arial,12' 
+# set terminal svg size 1024,560 fixed  fname 'Arial'  fsize 12 rounded solid mouse standalone name "Throughput"
 set output "/dev/stdout"
 END
 

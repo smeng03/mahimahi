@@ -22,9 +22,6 @@ protected:
     const unsigned int packet_limit_;
     const unsigned int byte_limit_;
 
-    unsigned int size_bytes( void ) const;
-    unsigned int size_packets( void ) const;
-
     /* put a packet on the back of the queue */
     void accept( QueuedPacket && p );
 
@@ -41,6 +38,9 @@ public:
     QueuedPacket dequeue( void ) override;
 
     bool empty( void ) const override;
+
+    unsigned int size_bytes( void ) const override;
+    unsigned int size_packets( void ) const override;
 
     std::string to_string( void ) const override;
 

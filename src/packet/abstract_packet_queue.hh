@@ -16,6 +16,9 @@ public:
 
     virtual bool empty( void ) const = 0;
 
+		virtual unsigned int size_bytes( void ) const = 0;
+		virtual unsigned int size_packets( void ) const = 0;
+
     virtual ~AbstractPacketQueue() = default;
 
     virtual std::string to_string( void ) const = 0;

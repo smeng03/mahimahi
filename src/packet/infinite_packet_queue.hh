@@ -42,6 +42,17 @@ public:
         return internal_queue_.empty();
     }
 
+		unsigned int size_bytes( void ) const override
+		{
+			assert(false);
+			return 0;
+		}
+
+		unsigned int size_packets( void ) const override
+		{
+			return ((unsigned) internal_queue_.size());
+		}
+
     std::string to_string( void ) const override
     {
         return "infinite";
