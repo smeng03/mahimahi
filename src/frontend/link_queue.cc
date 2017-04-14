@@ -110,7 +110,7 @@ void LinkQueue::record_arrival( const uint64_t arrival_time, const size_t pkt_si
     /* log it */
     if ( log_ ) {
         *log_ << arrival_time << " + " << pkt_size << " " << src << ":" << dst 
-					    << queue_bytes << " " << queue_packets << endl;
+					    << " " << queue_bytes << " " << queue_packets << endl;
     }
 
     /* meter it */
@@ -123,7 +123,10 @@ void LinkQueue::record_departure_opportunity( void )
 {
     /* log the delivery opportunity */ 
     if ( log_ ) {
-        *log_ << next_delivery_time() << " # " << PACKET_SIZE << endl;
+				unsigned int queue_bytes   = packet_queue_->size_bytes();
+				unsigned int queue_packets = packet_queue_->size_packets();
+        *log_ << next_delivery_time() << " # " << PACKET_SIZE
+					    << " " << queue_bytes << " " << queue_packets << endl;
     }
 
     /* meter the delivery opportunity */
@@ -143,7 +146,7 @@ void LinkQueue::record_departure( const uint64_t departure_time, const QueuedPac
 			*log_ << departure_time << " - " << packet.contents.size()
 						<< " " << departure_time - packet.arrival_time << " "
 						<< src << ":" << dst
-						<< queue_bytes << " " << queue_packets << endl;
+						<< " " << queue_bytes << " " << queue_packets << endl;
     }
 
     /* meter the delivery */
