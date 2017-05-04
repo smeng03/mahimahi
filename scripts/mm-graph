@@ -1,0 +1,222 @@
+#!/usr/bin/env python
+
+import sys, os
+import re
+from collections import defaultdict
+import numpy as np
+from subprocess import *
+import argparse
+
+flatten = lambda l: [item for sublist in l for item in sublist]
+
+parser = argparse.ArgumentParser(description="plot throughput and delay from a mahimahi trace")
+parser.add_argument('log', type=str, help="path to mahimahi trace")
+parser.add_argument('ms_per_bin', type=int, help="granularity of x-axis in plot")
+parser.add_argument('--ports',type=str,help="comma-separated list of ports to identify flows. consecutive ports can be shortened with ellipses, e.g. 1000,...,1004 is equivalent to 1000,1001,1002,1003,1004")
+parser.add_argument('--title',type=str,help="plot title")
+parser.add_argument('--key',help="add key to plot", action='store_true')
+args = parser.parse_args()
+
+log = args.log
+ms_per_bin = args.ms_per_bin
+ports = []
+try:
+    if args.ports is not None:
+        tmp = args.ports.split(",")
+        for i in range(len(tmp)):
+            if "." in tmp[i]:
+                ports += range(int(tmp[i-1])+1,int(tmp[i+1]))
+            else:
+                ports.append(int(tmp[i]))
+    ports = map(lambda x : str(x), ports)
+except:
+    print "error: malformed port list"
+    parser.print_help()
+
+def ms_to_bin(ms):
+    return ms / ms_per_bin
+
+def bin_to_seconds(b):
+    return "%.3f" % (b * ms_per_bin / 1000.0)
+
+def bits_to_mbps(bits):
+    return bits / (ms_per_bin / 1000.0) / 1000000.0
+###
+
+capacity = defaultdict(int)
+arrivals = defaultdict(lambda : defaultdict(int))
+departures = defaultdict(lambda : defaultdict(int))
+delays = defaultdict(list)
+all_delays = []
+
+first_t, last_t, base_t = None, None, None
+capacity_sum, arrival_sum, departure_sum = 0, 0, 0
+
+### parse log file
+header = True
+with open(log) as f:
+    for l in f:
+        if header:
+            m = re.search(r"^# base timestamp: (\d+)", l)
+            if m:
+                base_t = int(m.groups()[0])
+                continue
+            elif l[0] == "#":
+                continue
+            else:
+                header = False
+
+        sp = l.strip().split(" ")
+        t, etype, num_bytes = sp[0:3]
+
+        t = int(t)
+        t -= base_t
+        tbin = ms_to_bin(t)
+
+        if not last_t:
+            first_t = t
+            last_t = t
+        last_t = max(t, last_t)
+
+        num_bytes = int(num_bytes)
+        num_bits = num_bytes * 8
+
+        if etype == "+":
+            flow = sp[3]
+            arrivals[tbin][flow] += num_bits
+            arrivals[tbin]["sum"] += num_bits
+            arrival_sum += num_bits
+        elif etype == "-":
+            flow = sp[3]
+            departures[tbin][flow] += num_bits
+            departures[tbin]["sum"] += num_bits
+            departure_sum += num_bits
+
+            try:
+                delay = int(sp[4])
+            except:
+                sys.exit("invalid departure format, expected: \"[t] - [num_bytes] [src:dst] [delay]\", got: \"%s\"" % l.strip())
+
+            delays[tbin].append(delay)
+            all_delays.append(delay)
+            
+        elif etype == "#":
+            capacity[tbin] += num_bits
+            capacity_sum += num_bits
+        else:
+            sys.exit("unrecognized event type: %s" % etype)
+###
+
+if not first_t:
+    sys.exit("must have at least one event")
+if len(all_delays) <= 0:
+    sys.exit("must have at least one departure event")
+
+### print statistics
+duration = (last_t - first_t) / 1000.0
+avg_capacity = (capacity_sum / duration) / 1000000.0
+avg_ingress = (arrival_sum / duration) / 1000000.0
+avg_thru = (departure_sum / duration) / 1000000.0
+
+all_delays.sort()
+#ppavg = float(sum(all_delays)) / max(len(all_delays), 1)
+#pp50 = all_delays[ int(0.50 * len(all_delays)) ] 
+#pp95 = all_delays[ int(0.95 * len(all_delays)) ]
+ppavg = np.mean(all_delays)
+pp50 = np.percentile(all_delays, 50)
+pp95 = np.percentile(all_delays, 95)
+
+sys.stderr.write("duration: %.2f seconds\n" % duration)
+sys.stderr.write("average capacity: %.2f Mbit/s\n" % avg_capacity)
+sys.stderr.write("average throughput: %.2f Mbit/s (%.1f%% utilization)\n" % 
+        (avg_thru, 100.0 * (avg_thru / avg_capacity)))
+sys.stderr.write("per-packet queueing delay: avg/median/95th = %.0f/%.0f/%.0f ms \n" % (ppavg, pp50, pp95))
+###
+
+### compile data for gnuplot
+keys = [arrivals.keys(),departures.keys(),capacity.keys()]
+first_bin = min(map(lambda x : min(x), keys))
+last_bin = max(map(lambda x : max(x), keys))
+if first_bin == last_bin:
+    sys.exit("ms_per_bin=%d is too short for %.2f second trace" % (ms_per_bin, duration))
+
+arr_flows = flatten(map(lambda x : x.keys(), arrivals.values()))
+dep_flows = flatten(map(lambda x : x.keys(), departures.values()))
+all_observed_flows = set(arr_flows + dep_flows)
+flows_to_track = []
+for flow in all_observed_flows:
+    for port in ports:
+        if port in flow:
+            flows_to_track.append(flow)
+            break
+
+with open('tmp', 'w') as f:
+    current_buf_bytes = 0
+    for tbin in range(first_bin, last_bin+1):
+        t = bin_to_seconds( tbin )
+
+        dep_t = bits_to_mbps(departures[tbin]['sum']) if tbin in departures else 0
+        del_t = max(delays[tbin])
+
+        f.write("{} {} {}".format(t, dep_t, del_t))
+
+        for flow in flows_to_track:
+            f.write(" {}".format(bits_to_mbps(departures[tbin][flow]) if tbin in departures else 0))
+        f.write("\n")
+        #cap_t = bits_to_mbps(capacity[tbin]) if tbin in capacity else 0
+        #arr_t = bits_to_mbps(arrivals[tbin]['sum']) if tbin in arrivals else 0
+        #current_buf_bytes += (arrivals[tbin]['sum'] if tbin in arrivals else 0)
+        #current_buf_bytes -= (departures[tbin]['sum'] if tbin in departures else 0)
+        #print t, cap_t, arr_t, dep_t, current_buf_bytes
+### 
+
+### make plot 
+outfname = ".".join(log.split(".")[:-1]) + ".eps"
+outf = open(outfname, 'w')
+gnuplot = Popen('gnuplot', stdin=PIPE, stdout=outf)
+
+
+gnuplot.stdin.write("""
+set terminal postscript enhanced color eps font "Helvetica" 20
+set size 2,1
+
+set xtics 0,1,{duration}
+
+set yrange [0:{ymax}]
+set y2range[0:{y2max}]
+
+set ytics nomirror tc lt 1
+set y2tics nomirror tc lt 3
+
+set xlabel "Time (seconds)"
+set ylabel "Throughput (Mbit/s)" tc lt 1
+set y2label "Delay (ms)" tc lt 3
+
+set grid
+
+set title '{title}'
+
+plot 'tmp' u 1:2 w lines lw 5 notitle,\
+'' u 1:3 w lines lw 5 lt 3 notitle axes x1y2,\
+""".format(
+    title=(args.title if args.title is not None else log.split(".log")[0]),
+    duration=int(duration),
+    ymax=int(avg_thru)*2,
+    y2max=int(pp95 + 10)
+))
+
+col = 4
+for flow in flows_to_track:
+    gnuplot.stdin.write("'' u 1:{col} w lines lw 5 lt {col} {flow},\\\n".format(
+        col=col,
+        flow=(flow if args.key else 'notitle')
+    ))
+    col+=1
+
+gnuplot.communicate()
+gnuplot.wait()
+outf.flush()
+outf.close()
+###
+
+os.remove('tmp')
