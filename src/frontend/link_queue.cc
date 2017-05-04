@@ -104,13 +104,14 @@ LinkQueue::LinkQueue( const string & link_name, const string & filename, const s
 }
 
 void LinkQueue::record_arrival( const uint64_t arrival_time, const size_t pkt_size,
-		                            uint16_t src, uint16_t dst, unsigned int queue_bytes,
-																unsigned int queue_packets )
+		                            uint16_t src, uint16_t dst, 
+																unsigned int queue_bytes __attribute((unused)),
+																unsigned int queue_packets __attribute((unused)))
 {
     /* log it */
     if ( log_ ) {
-        *log_ << arrival_time << " + " << pkt_size << " " << src << ":" << dst 
-					    << " " << queue_bytes << " " << queue_packets << endl;
+        *log_ << arrival_time << " + " << pkt_size << " " << src << ":" << dst << endl;
+					    // << " " << queue_bytes << " " << queue_packets << endl;
     }
 
     /* meter it */
@@ -123,10 +124,10 @@ void LinkQueue::record_departure_opportunity( void )
 {
     /* log the delivery opportunity */ 
     if ( log_ ) {
-				unsigned int queue_bytes   = packet_queue_->size_bytes();
-				unsigned int queue_packets = packet_queue_->size_packets();
-        *log_ << next_delivery_time() << " # " << PACKET_SIZE
-					    << " " << queue_bytes << " " << queue_packets << endl;
+				// unsigned int queue_bytes   = packet_queue_->size_bytes();
+				// unsigned int queue_packets = packet_queue_->size_packets();
+        *log_ << next_delivery_time() << " # " << PACKET_SIZE << endl;
+					    // << " " << queue_bytes << " " << queue_packets << endl;
     }
 
     /* meter the delivery opportunity */
@@ -140,13 +141,13 @@ void LinkQueue::record_departure( const uint64_t departure_time, const QueuedPac
     /* log the delivery */
     if ( log_ ) {
 			uint16_t src, dst;
-			unsigned int queue_bytes   = packet_queue_->size_bytes();
-			unsigned int queue_packets = packet_queue_->size_packets();
+			// unsigned int queue_bytes   = packet_queue_->size_bytes();
+			// unsigned int queue_packets = packet_queue_->size_packets();
 			_parse_ports((const unsigned char *) packet.contents.substr(24,4).c_str(), &src, &dst);
 			*log_ << departure_time << " - " << packet.contents.size()
-						<< " " << departure_time - packet.arrival_time << " "
-						<< src << ":" << dst
-						<< " " << queue_bytes << " " << queue_packets << endl;
+						<< " " << src << ":" << dst
+						<< " " << departure_time - packet.arrival_time << endl;
+						// << " " << queue_bytes << " " << queue_packets << endl;
     }
 
     /* meter the delivery */
@@ -175,8 +176,8 @@ void LinkQueue::read_packet( const string & contents )
 								 queue_packets = 0;
 		if ( log_ ) {
 			_parse_ports((const unsigned char *) contents.substr(24,4).c_str(), &src, &dst);
-			queue_bytes = packet_queue_->size_bytes();
-			queue_packets = packet_queue_->size_packets();
+			//queue_bytes = packet_queue_->size_bytes();
+			//queue_packets = packet_queue_->size_packets();
 		}
     record_arrival( now, contents.size(), src, dst, queue_bytes, queue_packets );
 
