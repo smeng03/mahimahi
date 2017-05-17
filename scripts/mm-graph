@@ -71,7 +71,7 @@ if args.agg is not None:
 
 if args.ports is not None:
     try:
-        ports_to_track = parse_ports(s)
+        ports_to_track = parse_ports(args.ports)
     except:
         print "ERROR: error parsing port list."
         parser.print_help()
