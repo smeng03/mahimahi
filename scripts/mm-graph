@@ -17,16 +17,31 @@ flatten = lambda l: [item for sublist in l for item in sublist]
 parser = argparse.ArgumentParser(description="plot throughput and delay from a mahimahi trace")
 parser.add_argument('log', type=str, help="path to mahimahi trace")
 parser.add_argument('ms_per_bin', type=int, help="granularity of x-axis in plot")
+
 parser.add_argument('--ports',type=str,help="comma-separated list of ports to identify flows. denote portranges with colons, e.g. 1000:1002 is equivalent to 1000,1001,1002")
+
 parser.add_argument('--title',type=str,help="plot title")
 parser.add_argument('--key',help="add key to plot", action='store_true')
-parser.add_argument('--no-display',help="do not automatically open plot, just save it", action='store_true')
 parser.add_argument('--xtics',type=int, help="interval between x values on plot")
+parser.add_argument('--line-width',type=int)
+parser.add_argument('--plot-width',type=int)
 parser.add_argument('--xrange',type=str,help="range of time values to plot, in seconds, \"min:max\", default=*:*")
 parser.add_argument('--yrange',type=str,help="range of throughput to plot, in Mbps, \"min:max\", default=*:*")
 parser.add_argument('--y2range',type=str,help="range of delay values to plot, in ms, \"min:max\", default=*:*")
+parser.add_argument('--no-display',help="do not automatically open plot, just save it", action='store_true')
+parser.add_argument('--no-sum',help="do not plot sum throughput", action='store_true')
+parser.add_argument('--no-delay',help="do not plot delay", action='store_true')
+parser.add_argument('--no-grid',help="do not display grid on plot", action='store_true')
+parser.add_argument('--fake',help="output gnuplot script and parsed data without plotting",action='store_true')
+
 parser.add_argument('--agg',type=str,help="path to list of port ranges and flow names to aggregate in plot")
 parser.add_argument('--link-dir',type=str,help="direction (up|down) of link log")
+
+parser.add_argument('--bg',type=str,help="path to file specifying background traffic pattern")
+parser.add_argument('--plot-expected',help="plot the expected throughput based on the background traffic (requires --bg)",action='store_true')
+
+parser.add_argument('--nimbus',type=str,help='path to nimbus output file, adds red boxes for incorrect mode to plot')
+
 args = parser.parse_args()
 
 def parse_ports(s):
@@ -85,6 +100,24 @@ if args.link_dir is not None:
         uplink = False
     else:
         print "ERROR: unknown link direction type"
+        parser.print_help()
+        sys.exit(-1)
+
+
+if args.bg is not None:
+    if not os.path.exists(args.bg):
+        print "ERROR: could not find bg file", args.bg
+        parser.print_help()
+        sys.exit(-1)
+else:
+    if args.plot_expected or args.nimbus is not None:
+        print "ERROR: requires --bg FILE"
+        parser.print_help()
+        sys.exit(-1)
+
+if args.nimbus is not None:
+    if not os.path.exists(args.nimbus):
+        print "ERROR: could not find nimbus file", args.nimbus
         parser.print_help()
         sys.exit(-1)
 
@@ -206,7 +239,8 @@ flow_to_name = {}
 for flow in all_observed_flows:
     for port in ports_to_track:
         if port in flow:
-            flows_to_track.append(flow)
+            if not flow in flows_to_track:
+                flows_to_track.append(flow)
             src,dst = flow.split(":")
             port = flow
             if src in ports_to_track:
@@ -231,6 +265,9 @@ if args.xrange:
     else:
         xmax = float(xmax) * 1000.0
     duration = (xmax - xmin) / 1000.0
+
+xmin_s = int(xmin / 1000.0) if xmin else 0
+xmax_s = int(xmax / 1000.0) if xmax else int(last_t / 1000.0)
 
 avg_capacity = (capacity_sum / duration) / 1000000.0
 avg_ingress = (arrival_sum['sum'] / duration) / 1000000.0
@@ -295,20 +332,31 @@ with open('tmp', 'w') as f:
 ### 
 
 ### make plot a
-outfbase = ".".join(log.split(".")[:-1]) 
-outfname = outfbase + ".eps"
-outf = open(outfname, 'w')
-gnuplot = Popen('gnuplot', stdin=PIPE, stdout=outf)
+gnuplot = None
+outf = None
+if args.fake is not None and args.fake:
+    gnuplot = Popen('cat', stdin=PIPE)
+else:
+    outfbase = ".".join(log.split(".")[:-1]) 
+    outfname = outfbase + ".eps"
+    outf = open(outfname, 'w')
+    gnuplot = Popen('gnuplot', stdin=PIPE, stdout=outf)
 
 ranges = ["*:*","*:*","*:*"]
 for i,d in enumerate([args.xrange,args.yrange,args.y2range]):
     if d is not None:
-        ranges[i] = d
+        if i == 0:
+            ranges[i] = "0:"+str(int(d.split(":")[1])-xmin_s)
+        else:
+            ranges[i] = d
     else:
         if i == 1:
             ranges[i] = "0:"+str(int(avg_capacity)*2)
+            #ranges[i] = "0:"+str(int(avg_thru)*2)
         elif i == 2:
             ranges[i] = "0:"+str(int(pp95 + 10))
+            #ranges[i] = "-{m}:{m}".format(m=max(all_delays))
+
 
 width = 2
 lw = 5
@@ -318,6 +366,21 @@ if args.xtics is not None:
 else:
     args.xtics = (duration / 20.0 / 2)
 
+if args.line_width is not None:
+    lw = args.line_width
+
+if args.plot_width is not None:
+    width = args.plot_width
+
+title = log.split(".log")[0]
+title += " / avg egress: {:.2f} Mbit/s ({:.1f}%) / median per-pkt delay: {:.0f} ms ".format(
+        avg_thru, 
+        100.0 * (avg_thru / avg_capacity),
+        pp50
+)
+if args.title is not None:
+    title = args.title
+
 gnuplot.stdin.write("""
 set terminal postscript enhanced color eps font "Helvetica" 20
 set size {width},1
@@ -326,58 +389,145 @@ set xtics 0,{xtics},{duration}
 
 set xrange [{ranges[0]}]
 set yrange [{ranges[1]}]
-set y2range[{ranges[2]}]
+set y2range [{ranges[2]}]
 
 set ytics nomirror tc lt 1
 set y2tics nomirror tc lt 3
 
 set xlabel "Time (seconds)"
 set ylabel "Throughput (Mbit/s)" tc lt 1
-set y2label "Delay (ms)" tc lt 3
+set y2label "Per-Pkt Queueing Delay (ms)" tc lt 3
 
-set grid
+{no_grid}set grid
+
+set style rect fc lt 7 behind fs solid 0.15 noborder
 
 set title '{title}'
-
-plot 'tmp' u 1:2 w lines lw {lw} {sum_title},\
-'' u 1:3 w lines lw {lw} lt 3 notitle axes x1y2,\
 """.format(
-    title=(args.title if args.title is not None else log.split(".log")[0]),
+    title=title,
     duration=int(duration),
-    ymax=int(avg_thru)*2,
-    y2max=int(pp95 + 10),
     xtics=int(round(args.xtics)),
-    sum_title=("ti 'sum'" if args.key else 'notitle'),
     ranges=ranges,
     width=width,
-    lw=lw
+    lw=lw,
+    no_grid='un' if args.no_grid else ''
 ))
+
+if args.bg:
+    time_to_mode = {}
+    try:
+        with open(args.bg) as f:
+            ymax = int(avg_capacity) * 2
+            r = f.readlines()
+            for i in range(len(r)):
+                l = r[i].strip().split(" ")
+                if "=" in l[1]:
+                    gnuplot.stdin.write("set arrow from {t},0 to {t},{ymax} nohead lc rgb \"black\" lw 5\n".format(
+                        t=l[0],
+                        ymax=ymax
+		    ))
+                    continue
+                if "X" in l[1]:
+                    break
+
+                t,label,expected,mode = l
+                t = int(t)
+                next_t = int(r[i+1].split(" ")[0])
+                
+                gnuplot.stdin.write("set label \"{label}\" at {x},{y}\n".format(
+                    label=label,
+                    x=(t + ((next_t - t) / 2) - len(label) - 1),
+                    y=int(ymax * 0.95)
+                ))
+
+                time_to_mode[t] = mode
+
+    except Exception as e:
+        print "ERROR: error parsing bg file --",e
+        parser.print_help()
+        sys.exit(-1)
+
+    if args.nimbus is not None:
+        try:
+            with open(args.nimbus) as f:
+                initMode = 'XTCP'
+                i = 0
+                for l in f:
+                    if i == 0:
+                        initMode = l.split("initMode=")[1].split(" ")[0]
+
+
+
+                    i+=1
+
+
+        except Exception as e:
+            print "ERROR: error parsing nimbus output file --",e
+            parser.print_help()
+            sys.exit(-1)
+    
+
+first_gplot_line = True
+if not args.no_sum:
+    gnuplot.stdin.write("""
+{plot} u ($1-{adjust}):2 w lines lw {lw} lt 1 {sum_title},\\
+""".format(
+    adjust=xmin_s,
+    plot=("plot 'tmp'" if first_gplot_line else "''"),
+    sum_title=("ti 'sum'" if args.key else 'notitle'),
+    lw=lw   
+))
+    first_gplot_line = False
 
 col = 4
 if flows_to_track:
     for flow in flows_to_track:
-        gnuplot.stdin.write("'' u 1:{col} w lines lw {lw} lt {col} {flow},\\\n".format(
+        gnuplot.stdin.write("{plot} u ($1-{adjust}):{col} w lines lw {lw} lt {lt} {flow},\\\n".format(
+            adjust=xmin_s,
+            plot=("plot 'tmp'" if first_gplot_line else "''"),
             col=col,
+            lt=col if not first_gplot_line else 1,
             flow=("ti '{}'".format(flow_to_name[flow]) if args.key else 'notitle'),
             lw=lw
         ))
         col+=1
+        first_gplot_line = False
 if agg_names:
     for agg in agg_names:
-        gnuplot.stdin.write("'' u 1:{col} w lines lw {lw} lt {col} {flow},\\\n".format(
+        gnuplot.stdin.write("{plot} u ($1-{adjust}):{col} w lines lw {lw} lt {lt} {flow},\\\n".format(
+            adjust=xmin_s,
+            plot=("plot 'tmp'" if first_gplot_line else "''"),
             col=col,
+            lt=col if not first_gplot_line else 1,
             flow=("ti '{}'".format(agg) if args.key else 'notitle'),
             lw=lw
         ))
         col+=1
+        first_gplot_line = False
+
+if not args.no_delay:
+    gnuplot.stdin.write("{plot} u ($1-{adjust}):3 w lines lw {lw} lt 3 notitle axes x1y2,\\\n".format(
+    adjust=xmin_s,
+    plot=("plot 'tmp'" if first_gplot_line else "''"),
+    lw=lw
+))
+    first_gplot_line = False
+
+if args.plot_expected:
+    gnuplot.stdin.write("'{f}' u 1:3 with steps lw {lw} lc rgb \"gold\" {ti},\\\n".format(
+        f=args.bg,
+        lw=lw,
+        ti=("ti 'Best Rate'" if args.key else 'notitle')
+    ))
 
 gnuplot.communicate()
 gnuplot.wait()
-outf.flush()
-outf.close()
 ###
 
-os.remove('tmp')
-os.system("epstopdf " + outfname)
-if not args.no_display:
-    os.system("open " + outfname)
+if args.fake is None or not args.fake:
+    outf.flush()
+    outf.close()
+    os.remove('tmp')
+    os.system("epstopdf " + outfname)
+    if not args.no_display:
+	os.system("open " + outfname)
