@@ -22,7 +22,7 @@ parser.add_argument('--ports',type=str,help="comma-separated list of ports to id
 
 parser.add_argument('--title',type=str,help="plot title")
 parser.add_argument('--key',help="add key to plot", action='store_true')
-parser.add_argument('--xtics',type=int, help="interval between x values on plot")
+parser.add_argument('--xtics',type=float, help="interval between x values on plot")
 parser.add_argument('--line-width',type=int)
 parser.add_argument('--plot-width',type=int)
 parser.add_argument('--xrange',type=str,help="range of time values to plot, in seconds, \"min:max\", default=*:*")
@@ -366,11 +366,12 @@ if args.xtics is not None:
 else:
     args.xtics = (duration / 20.0 / 2)
 
-if args.line_width is not None:
-    lw = args.line_width
-
 if args.plot_width is not None:
     width = args.plot_width
+    lw = int((width / 2.0) * 5.0)
+
+if args.line_width is not None:
+    lw = args.line_width
 
 title = log.split(".log")[0]
 title += " / avg egress: {:.2f} Mbit/s ({:.1f}%) / median per-pkt delay: {:.0f} ms ".format(
