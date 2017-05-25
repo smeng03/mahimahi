@@ -33,6 +33,7 @@ parser.add_argument('--no-sum',help="do not plot sum throughput", action='store_
 parser.add_argument('--no-delay',help="do not plot delay", action='store_true')
 parser.add_argument('--no-grid',help="do not display grid on plot", action='store_true')
 parser.add_argument('--fake',help="output gnuplot script and parsed data without plotting",action='store_true')
+parser.add_argument('--delay-f',type=str,help="how to calculate delay over each interval: (min|max|avg|X%%) where X is %%tile, e.g. use --delay-f 50%% for median",default="50%")
 
 parser.add_argument('--agg',type=str,help="path to list of port ranges and flow names to aggregate in plot")
 parser.add_argument('--link-dir',type=str,help="direction (up|down) of link log")
@@ -306,14 +307,24 @@ last_bin = max(map(lambda x : max(x), keys))
 if first_bin == last_bin:
     sys.exit("ms_per_bin=%d is too short for %.2f second trace" % (ms_per_bin, duration))
 
+if args.delay_f == "min":
+    delay_f = (lambda ds : min(ds))
+elif args.delay_f == "max":
+    delay_f = (lambda ds : max(ds))
+elif args.delay_f == "avg":
+    delay_f = (lambda ds : numpy.mean(ds))
+elif "%" in args.delay_f:
+    ptile = int(args.delay_f.split('%')[0])
+    delay_f = (lambda ds : np.percentile(ds,ptile))
 
-with open('tmp', 'w') as f:
+TMP_FILE = '/tmp/mm-graph.tmp'
+with open(TMP_FILE, 'w') as f:
     current_buf_bytes = 0
     for tbin in range(first_bin, last_bin+1):
         t = bin_to_seconds( tbin )
 
         dep_t = bits_to_mbps(departures[tbin]['sum']) if tbin in departures else 0
-        del_t = max(delays[tbin]) if tbin in delays else 0
+        del_t = delay_f(delays[tbin]) if tbin in delays else 0
 
         f.write("{} {} {}".format(t, dep_t, del_t))
 
@@ -528,7 +539,7 @@ gnuplot.wait()
 if args.fake is None or not args.fake:
     outf.flush()
     outf.close()
-    os.remove('tmp')
+    os.remove(TMP_FILE)
     os.system("epstopdf " + outfname)
     if not args.no_display:
 	os.system("open " + outfname)
