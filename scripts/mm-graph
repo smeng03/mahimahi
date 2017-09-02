@@ -298,7 +298,7 @@ if agg_names:
     for agg in agg_names: # TODO sorted?
         thru = bits_to_mbps(departure_sum[agg], duration)
         util = 100.0 * (thru / avg_capacity)
-        sys.stderr.write("\t%s %.2f Mbit/s %.1f%%\n" % (agg, thru, util))
+        sys.stderr.write("\t%s %.2f Mbit/s %.1f%%\n" % (agg.split(" ")[0], thru, util))
 
 ### compile data for gnuplot
 keys = [arrivals.keys(),departures.keys(),capacity.keys()]
@@ -397,6 +397,8 @@ gnuplot.stdin.write("""
 set terminal postscript enhanced color eps font "Helvetica" 20
 set size {width},1
 
+{key}
+
 set xtics 0,{xtics},{duration}
 
 set xrange [{ranges[0]}]
@@ -422,7 +424,8 @@ set title '{title}'
     ranges=ranges,
     width=width,
     lw=lw,
-    no_grid='un' if args.no_grid else ''
+    no_grid='un' if args.no_grid else '',
+    key="set key outside top center horizontal" if args.key else "unset key"
 ))
 
 if args.bg:
@@ -485,7 +488,7 @@ if not args.no_sum:
 {plot} u ($1-{adjust}):2 w lines lw {lw} lt 1 {sum_title},\\
 """.format(
     adjust=xmin_s,
-    plot=("plot 'tmp'" if first_gplot_line else "''"),
+    plot=("plot '{}'".format(TMP_FILE) if first_gplot_line else "''"),
     sum_title=("ti 'sum'" if args.key else 'notitle'),
     lw=lw   
 ))
@@ -496,7 +499,7 @@ if flows_to_track:
     for flow in flows_to_track:
         gnuplot.stdin.write("{plot} u ($1-{adjust}):{col} w lines lw {lw} lt {lt} {flow},\\\n".format(
             adjust=xmin_s,
-            plot=("plot 'tmp'" if first_gplot_line else "''"),
+            plot=("plot '{}'".format(TMP_FILE) if first_gplot_line else "''"),
             col=col,
             lt=col if not first_gplot_line else 1,
             flow=("ti '{}'".format(flow_to_name[flow]) if args.key else 'notitle'),
@@ -508,10 +511,12 @@ if agg_names:
     for agg in agg_names:
         gnuplot.stdin.write("{plot} u ($1-{adjust}):{col} w lines lw {lw} lt {lt} {flow},\\\n".format(
             adjust=xmin_s,
-            plot=("plot 'tmp'" if first_gplot_line else "''"),
+            plot=("plot '{}'".format(TMP_FILE) if first_gplot_line else "''"),
             col=col,
             lt=col if not first_gplot_line else 1,
-            flow=("ti '{}'".format(agg) if args.key else 'notitle'),
+            flow=("ti '{}'".format(agg.format(
+                util = "{:.1f}".format(100.0 * (bits_to_mbps(departure_sum[agg], duration) / avg_capacity))+"%"
+            )) if args.key else 'notitle'),
             lw=lw
         ))
         col+=1
@@ -520,7 +525,7 @@ if agg_names:
 if not args.no_delay:
     gnuplot.stdin.write("{plot} u ($1-{adjust}):3 w lines lw {lw} lt 3 notitle axes x1y2,\\\n".format(
     adjust=xmin_s,
-    plot=("plot 'tmp'" if first_gplot_line else "''"),
+    plot=("plot '{}'".format(TMP_FILE) if first_gplot_line else "''"),
     lw=lw
 ))
     first_gplot_line = False
