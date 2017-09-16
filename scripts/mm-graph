@@ -18,30 +18,32 @@ parser = argparse.ArgumentParser(description="plot throughput and delay from a m
 parser.add_argument('log', type=str, help="path to mahimahi trace")
 parser.add_argument('ms_per_bin', type=int, help="granularity of x-axis in plot")
 
-parser.add_argument('--ports',type=str,help="comma-separated list of ports to identify flows. denote portranges with colons, e.g. 1000:1002 is equivalent to 1000,1001,1002")
 
 parser.add_argument('--title',type=str,help="plot title")
 parser.add_argument('--key',help="add key to plot", action='store_true')
 parser.add_argument('--xtics',type=float, help="interval between x values on plot")
 parser.add_argument('--line-width',type=int)
 parser.add_argument('--plot-width',type=int)
+parser.add_argument('--font-size',type=int)
+
 parser.add_argument('--xrange',type=str,help="range of time values to plot, in seconds, \"min:max\", default=*:*")
 parser.add_argument('--yrange',type=str,help="range of throughput to plot, in Mbps, \"min:max\", default=*:*")
 parser.add_argument('--y2range',type=str,help="range of delay values to plot, in ms, \"min:max\", default=*:*")
+
 parser.add_argument('--no-display',help="do not automatically open plot, just save it", action='store_true')
 parser.add_argument('--no-sum',help="do not plot sum throughput", action='store_true')
 parser.add_argument('--no-delay',help="do not plot delay", action='store_true')
 parser.add_argument('--no-grid',help="do not display grid on plot", action='store_true')
 parser.add_argument('--fake',help="output gnuplot script and parsed data without plotting",action='store_true')
-parser.add_argument('--delay-f',type=str,help="how to calculate delay over each interval: (min|max|avg|X%%) where X is %%tile, e.g. use --delay-f 50%% for median",default="50%")
 
 parser.add_argument('--agg',type=str,help="path to list of port ranges and flow names to aggregate in plot")
 parser.add_argument('--link-dir',type=str,help="direction (up|down) of link log")
-
 parser.add_argument('--bg',type=str,help="path to file specifying background traffic pattern")
 parser.add_argument('--plot-expected',help="plot the expected throughput based on the background traffic (requires --bg)",action='store_true')
+parser.add_argument('--delay-f',type=str,help="how to calculate delay over each interval: (min|max|avg|X%%) where X is %%tile, e.g. use --delay-f 50%% for median",default="50%")
 
 parser.add_argument('--nimbus',type=str,help='path to nimbus output file, adds red boxes for incorrect mode to plot')
+parser.add_argument('--ports',type=str,help="comma-separated list of ports to identify flows. denote portranges with colons, e.g. 1000:1002 is equivalent to 1000,1001,1002")
 
 args = parser.parse_args()
 
@@ -394,7 +396,7 @@ if args.title is not None:
     title = args.title
 
 gnuplot.stdin.write("""
-set terminal postscript enhanced color eps font "Helvetica" 20
+set terminal postscript enhanced color eps font "Helvetica" {font_size}
 set size {width},1
 
 {key}
@@ -425,7 +427,8 @@ set title '{title}'
     width=width,
     lw=lw,
     no_grid='un' if args.no_grid else '',
-    key="set key outside top center horizontal" if args.key else "unset key"
+    key="set key outside top center horizontal" if args.key else "unset key",
+    font_size=(args.font_size) if args.font_size else 20
 ))
 
 if args.bg:
@@ -451,8 +454,8 @@ if args.bg:
                 
                 gnuplot.stdin.write("set label \"{label}\" at {x},{y}\n".format(
                     label=label,
-                    x=(t + ((next_t - t) / 2) - len(label) - 1),
-                    y=int(ymax * 0.95)
+                    x=(t + ((next_t - t) / 2) - (len(label)/2) - 1),
+                    y=int(ymax * 1.05)
                 ))
 
                 time_to_mode[t] = mode
