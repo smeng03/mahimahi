@@ -60,7 +60,7 @@ int main( int argc, char *argv[] )
             }
         }
 
-        PacketShell<IIDLoss> loss_app( "loss", user_environment );
+        PacketShell<DeterministicLoss> loss_app( "loss", user_environment );
 
         string shell_prefix = "[loss ";
         if ( link == "uplink" ) {

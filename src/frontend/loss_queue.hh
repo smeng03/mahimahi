@@ -46,6 +46,19 @@ public:
     IIDLoss( const double loss_rate ) : drop_dist_( loss_rate ) {}
 };
 
+class DeterministicLoss : public LossQueue
+{
+private:
+    double loss_rate;
+    int drop_counter;
+    bool drop_packet( const std::string & packet ) override;
+
+public:
+    DeterministicLoss( const double lr ) : loss_rate(lr),  drop_counter(0) {
+        srand(0);
+    }
+};
+
 class SwitchingLink : public LossQueue
 {
 private:

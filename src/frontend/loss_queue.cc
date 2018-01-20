@@ -1,6 +1,7 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <limits>
+#include <iostream>
 
 #include "loss_queue.hh"
 #include "timestamp.hh"
@@ -34,6 +35,22 @@ unsigned int LossQueue::wait_time( void )
 bool IIDLoss::drop_packet( const string & packet __attribute((unused)) )
 {
     return drop_dist_( prng_ );
+}
+
+bool DeterministicLoss::drop_packet( const string & packet __attribute((unused)) )
+{
+    //this->drop_counter++;
+    //if (this->drop_counter % 100 == 0) {
+    //    return true;
+    //}
+
+    //return false;
+    int super_random_value = rand() % 10000;
+    if (super_random_value < ((int) (this->loss_rate * 10000))) {
+        return true;
+    }
+    return false;
+    //return (rand() % 100) < ((int) this->loss_rate * 100);
 }
 
 static const double MS_PER_SECOND = 1000.0;
