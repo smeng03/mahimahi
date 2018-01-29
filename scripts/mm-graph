@@ -387,13 +387,13 @@ if args.line_width is not None:
     lw = args.line_width
 
 title = log.split(".log")[0]
+if args.title is not None:
+    title = args.title
 title += " / avg egress: {:.2f} Mbit/s ({:.1f}%) / median per-pkt delay: {:.0f} ms ".format(
         avg_thru, 
         100.0 * (avg_thru / avg_capacity),
         pp50
 )
-if args.title is not None:
-    title = args.title
 
 gnuplot.stdin.write("""
 set terminal postscript enhanced color eps font "Helvetica" {font_size}
