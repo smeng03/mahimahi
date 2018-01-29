@@ -35,6 +35,7 @@ parser.add_argument('--no-sum',help="do not plot sum throughput", action='store_
 parser.add_argument('--no-delay',help="do not plot delay", action='store_true')
 parser.add_argument('--no-grid',help="do not display grid on plot", action='store_true')
 parser.add_argument('--fake',help="output gnuplot script and parsed data without plotting",action='store_true')
+parser.add_argument('--no-port', help="original version of mahimahi without port information",action='store_true')
 
 parser.add_argument('--agg',type=str,help="path to list of port ranges and flow names to aggregate in plot")
 parser.add_argument('--link-dir',type=str,help="direction (up|down) of link log")
@@ -194,29 +195,37 @@ with open(log) as f:
         num_bits = num_bytes * 8
 
         if etype == "+":
-            flow = sp[3]
-            agg_name = find_agg_name(flow)
-            arrivals[tbin][flow] += num_bits
+            if args.no_port is not None and not args.no_port:
+                flow = sp[3]
+                agg_name = find_agg_name(flow)
+                arrivals[tbin][flow] += num_bits
+                arrival_sum[flow] += num_bits
+                if agg_name:
+                    arrivals[tbin][agg_name] += num_bits
+                    arrival_sum[agg_name] += num_bits
             arrivals[tbin]['sum'] += num_bits
-            arrival_sum[flow] += num_bits
             arrival_sum['sum'] += num_bits
-            if agg_name:
-                arrivals[tbin][agg_name] += num_bits
-                arrival_sum[agg_name] += num_bits
         elif etype == "-":
-            flow = sp[3]
-            agg_name = find_agg_name(flow)
-            departures[tbin][flow] += num_bits
+            if args.no_port is not None and not args.no_port:
+                flow = sp[3]
+                agg_name = find_agg_name(flow)
+                departures[tbin][flow] += num_bits
+                departure_sum[flow] += num_bits
+                if agg_name:
+                    departures[tbin][agg_name] += num_bits
+                    departure_sum[agg_name] += num_bits
+                try:
+                    delay = int(sp[4])
+                except:
+                    sys.exit("invalid departure format, expected: \"[t] - [num_bytes] [src:dst] [delay]\", got: \"%s\"" % l.strip())
+            else:
+                try:
+                    delay = int(sp[3])
+                except:
+                    sys.exit("invalid departure format, expected: \"[t] - [num_bytes] [delay]\", got: \"%s\"" % l.strip())
+
             departures[tbin]['sum'] += num_bits
-            departure_sum[flow] += num_bits
             departure_sum['sum'] += num_bits
-            if agg_name:
-                departures[tbin][agg_name] += num_bits
-                departure_sum[agg_name] += num_bits
-            try:
-                delay = int(sp[4])
-            except:
-                sys.exit("invalid departure format, expected: \"[t] - [num_bytes] [src:dst] [delay]\", got: \"%s\"" % l.strip())
 
             delays[tbin].append(delay)
             all_delays.append(delay)
