@@ -9,6 +9,7 @@
 #include "pie_packet_queue.hh"
 #include "link_queue.hh"
 #include "packetshell.cc"
+#include "util.hh"
 
 using namespace std;
 
@@ -23,6 +24,9 @@ void usage_error( const string & program_name )
     cerr << "          --meter-all" << endl;
     cerr << "          --uplink-queue=QUEUE_TYPE --downlink-queue=QUEUE_TYPE" << endl;
     cerr << "          --uplink-queue-args=QUEUE_ARGS --downlink-queue-args=QUEUE_ARGS" << endl;
+    cerr << "          --cbr" << endl;
+    cerr << "                (if --cbr is used, UPLINK-TRACE and DOWNLINK-TRACE should be desired bitrate" << endl;
+    cerr << "                 rather than filename, expressed as \"XK\" for X Kbps or \"XM\" for X Mbps)" << endl;
     cerr << endl;
     cerr << "          QUEUE_TYPE = infinite | droptail | drophead | codel | pie" << endl;
     cerr << "          QUEUE_ARGS = \"NAME=NUMBER[, NAME2=NUMBER2, ...]\"" << endl;
@@ -99,6 +103,7 @@ int main( int argc, char *argv[] )
             { "downlink-queue",       required_argument, nullptr, 'w' },
             { "uplink-queue-args",    required_argument, nullptr, 'a' },
             { "downlink-queue-args",  required_argument, nullptr, 'b' },
+            { "cbr",                        no_argument, nullptr, 'c' },
             { 0,                                      0, nullptr, 0 }
         };
 
@@ -106,6 +111,7 @@ int main( int argc, char *argv[] )
         bool repeat = true;
         bool meter_uplink = false, meter_downlink = false;
         bool meter_uplink_delay = false, meter_downlink_delay = false;
+        bool constant_bitrate_trace = false;
         string uplink_queue_type = "infinite", downlink_queue_type = "infinite",
                uplink_queue_args, downlink_queue_args;
 
@@ -154,7 +160,11 @@ int main( int argc, char *argv[] )
             case 'b':
                 downlink_queue_args = optarg;
                 break;
+            case 'c':
+                constant_bitrate_trace = true;
+                break;
             case '?':
+                cerr << "Unknown arguemnt" << endl;
                 usage_error( argv[ 0 ] );
                 break;
             default:
@@ -166,8 +176,14 @@ int main( int argc, char *argv[] )
             usage_error( argv[ 0 ] );
         }
 
-        const string uplink_filename = argv[ optind ];
-        const string downlink_filename = argv[ optind + 1 ];
+        string uplink_filename = argv[ optind ];
+        string downlink_filename = argv[ optind + 1 ];
+        if (constant_bitrate_trace) {
+            uplink_filename = get_cbr_trace( uplink_filename );
+        }
+        if (constant_bitrate_trace) {
+            downlink_filename = get_cbr_trace( downlink_filename );
+        }
 
         vector<string> command;
 

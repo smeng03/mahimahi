@@ -8,12 +8,14 @@
 #include <cstdlib>
 #include <cassert>
 #include <fstream>
+#include <iostream>
 #include <resolv.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <arpa/inet.h>
 #include <memory>
 #include <numeric>
+#include <cmath>
 
 #include "util.hh"
 #include "exception.hh"
@@ -205,3 +207,80 @@ string get_working_directory( void )
 
     return cwd_ptr.get();
 }
+
+int gcd(int a, int b) {
+    int c;
+    while (b != 0) {
+        c = b;
+        b = a % b;
+        a = c;
+    }
+    return a;
+}
+
+bool file_exists( const string& filename ) {
+    ifstream f(filename.c_str());
+    return f.good();
+}
+
+void create_cbr_trace( string& bw, const string& trace_filename ) {
+    double val = stod(bw.substr(0, bw.size()-1));
+    double mbps;
+
+    ofstream trace_file(trace_filename);
+    if (!trace_file.is_open()) {
+        throw runtime_error( "unable to create new cbr trace file " + trace_filename );
+    }
+
+    if (bw.back() == 'M') {
+        mbps = val;
+    } else if (bw.back() == 'K') {
+        mbps = (val / 1000.0);
+    } else {
+        throw runtime_error( "invalid units for cbr trace, use K (Kbps) or M (Mbps)" );
+    }
+
+    double ppms   = mbps / 12.0;
+    int pps       = round(ppms * 1000.0);
+    int divisor   = gcd(pps, 1000);
+    int packets   = pps / divisor;
+    int num_slots = 1000 / divisor;
+    vector<int>     slots(num_slots, 0);
+    
+    if (packets >= num_slots) {
+        int i = 0;
+        while (packets > 0) {
+            slots[i % num_slots] += 1;
+            i++;
+            packets--;
+        }
+    } else {
+        int i = num_slots - 1;
+        int spacing = num_slots / packets;
+        while (packets > 0) {
+            slots[i] += 1;
+            i -= spacing;
+            packets--;
+        }
+    }
+
+    for (int ms = 0; ms < num_slots; ms++) {
+        if (slots[ms]) {
+            for (int j=0; j<slots[ms]; j++) {
+                trace_file << (ms + 1) << endl;
+            }
+        }
+    }
+
+    trace_file.close();
+}
+
+string get_cbr_trace( string& bw )
+{
+    string trace_filename = string(MACRO_AS_STR(TRACE_DIR)) + "/" + bw + ".cbr";
+    if (!file_exists(trace_filename)) {
+        create_cbr_trace( bw, trace_filename );
+    }
+    return trace_filename;
+}
+

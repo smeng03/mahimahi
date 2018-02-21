@@ -15,3 +15,4 @@ libutil_a_SOURCES = exception.hh ezio.cc ezio.hh                               \
         event_loop.hh event_loop.cc                                            \
         temp_file.hh temp_file.cc dns_server.hh dns_server.cc                  \
         socketpair.hh socketpair.cc
+libutil_a_CXXFLAGS = -DTRACE_DIR=$(pkgdatadir)/traces
