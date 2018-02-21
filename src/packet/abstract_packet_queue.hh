@@ -22,6 +22,8 @@ public:
     virtual ~AbstractPacketQueue() = default;
 
     virtual std::string to_string( void ) const = 0;
+
+    virtual void set_bdp( int bytes ) { (void)bytes; }
 };
 
 #endif /* ABSTRACT_PACKET_QUEUE */ 

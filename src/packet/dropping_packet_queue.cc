@@ -9,11 +9,13 @@
 using namespace std;
 
 DroppingPacketQueue::DroppingPacketQueue( const string & args )
-    : packet_limit_( get_arg( args, "packets" ) ),
-      byte_limit_( get_arg( args, "bytes" ) )
+    : bdp_byte_limit_( ),
+      packet_limit_( get_arg( args, "packets" ) ),
+      byte_limit_( get_arg( args, "bytes" ) ),
+      bdp_limit_( get_arg( args, "bdp" ) )
 {
-    if ( packet_limit_ == 0 and byte_limit_ == 0 ) {
-        throw runtime_error( "Dropping queue must have a byte or packet limit." );
+    if ( packet_limit_ == 0 and byte_limit_ == 0 and bdp_limit_ == 0) {
+        throw runtime_error( "Dropping queue must have a byte, packet, or BDP limit." );
     }
 }
 
@@ -46,6 +48,10 @@ bool DroppingPacketQueue::good_with( const unsigned int size_in_bytes,
         ret &= ( size_in_bytes <= byte_limit_ );
     }
 
+    if ( bdp_byte_limit_ ) {
+        ret &= ( size_in_bytes <= bdp_byte_limit_ );
+    }
+
     if ( packet_limit_ ) {
         ret &= ( size_in_packets <= packet_limit_ );
     }
@@ -62,6 +68,11 @@ unsigned int DroppingPacketQueue::size_bytes( void ) const
 {
     assert( queue_size_in_bytes_ >= 0 );
     return unsigned( queue_size_in_bytes_ );
+}
+
+void DroppingPacketQueue::set_bdp( int bytes )
+{
+    bdp_byte_limit_ = (bytes * bdp_limit_);
 }
 
 unsigned int DroppingPacketQueue::size_packets( void ) const
@@ -130,3 +141,5 @@ unsigned int DroppingPacketQueue::get_arg( const string & args, const string & n
         return myatoi( digit_string );
     }
 }
+
+

@@ -178,10 +178,31 @@ int main( int argc, char *argv[] )
 
         string uplink_filename = argv[ optind ];
         string downlink_filename = argv[ optind + 1 ];
+
+        unique_ptr<AbstractPacketQueue> uplink_packet_queue = 
+            get_packet_queue( uplink_queue_type, uplink_queue_args, argv[ 0 ] );
+
+        unique_ptr<AbstractPacketQueue> downlink_packet_queue = 
+            get_packet_queue( downlink_queue_type, downlink_queue_args, argv[ 0 ] );
+
         if (constant_bitrate_trace) {
+            int delay = 0;
+            for ( int i = 1; i < argc; i++ ) {
+                if (string(argv[i]).find("mm-delay") != string::npos) {
+                    delay = stoi(string(argv[i+1]));
+                    break;
+                }
+            }
+            if ( delay > 0 ) {
+                double uplink_bdp = bdp_bytes( str_to_mbps( uplink_filename ), delay );
+                double downlink_bdp = bdp_bytes( str_to_mbps( uplink_filename ), delay );
+                cout << "Uplink   BDP:\t" << uplink_bdp << "b\t(" << round(uplink_bdp / 1500) << "p)" << endl;
+                cout << "Downlink BDP:\t" << downlink_bdp << "b\t(" << round(downlink_bdp / 1500) << "p)" << endl;
+                uplink_packet_queue->set_bdp( round( uplink_bdp ) );
+                downlink_packet_queue->set_bdp( round( downlink_bdp ) );
+            }
+
             uplink_filename = get_cbr_trace( uplink_filename );
-        }
-        if (constant_bitrate_trace) {
             downlink_filename = get_cbr_trace( downlink_filename );
         }
 
@@ -199,11 +220,11 @@ int main( int argc, char *argv[] )
 
         link_shell_app.start_uplink( "[link] ", command,
                                      "Uplink", uplink_filename, uplink_logfile, repeat, meter_uplink, meter_uplink_delay,
-                                     get_packet_queue( uplink_queue_type, uplink_queue_args, argv[ 0 ] ),
+                                     uplink_packet_queue,
                                      command_line );
 
         link_shell_app.start_downlink( "Downlink", downlink_filename, downlink_logfile, repeat, meter_downlink, meter_downlink_delay,
-                                       get_packet_queue( downlink_queue_type, downlink_queue_args, argv[ 0 ] ),
+                                       downlink_packet_queue,
                                        command_line );
 
         return link_shell_app.wait_for_exit();

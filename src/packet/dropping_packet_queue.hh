@@ -13,6 +13,7 @@ class DroppingPacketQueue : public AbstractPacketQueue
 {
 private:
     int queue_size_in_bytes_ = 0, queue_size_in_packets_ = 0;
+    unsigned int bdp_byte_limit_;
 
     std::queue<QueuedPacket> internal_queue_ {};
 
@@ -21,6 +22,7 @@ private:
 protected:
     const unsigned int packet_limit_;
     const unsigned int byte_limit_;
+    const unsigned int bdp_limit_;
 
     /* put a packet on the back of the queue */
     void accept( QueuedPacket && p );
@@ -42,9 +44,12 @@ public:
     unsigned int size_bytes( void ) const override;
     unsigned int size_packets( void ) const override;
 
+    void set_bdp( int bytes ) override;
+
     std::string to_string( void ) const override;
 
     static unsigned int get_arg( const std::string & args, const std::string & name );
+
 };
 
 #endif /* DROPPING_PACKET_QUEUE_HH */ 
