@@ -26,6 +26,8 @@ template <typename T> void zero( T & x ) { memset( &x, 0, sizeof( x ) ); }
 std::string join( const std::vector< std::string > & command );
 std::string get_working_directory( void );
 bool file_exists( const std::string& filename );
+double str_to_mbps( std::string& bw );
+double bdp_bytes( double bw_mbps, double delay_ms );
 std::string get_cbr_trace( std::string& bw );
 
 class TemporarilyUnprivileged {

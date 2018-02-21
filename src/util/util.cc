@@ -223,14 +223,9 @@ bool file_exists( const string& filename ) {
     return f.good();
 }
 
-void create_cbr_trace( string& bw, const string& trace_filename ) {
+double str_to_mbps( string& bw ) {
     double val = stod(bw.substr(0, bw.size()-1));
     double mbps;
-
-    ofstream trace_file(trace_filename);
-    if (!trace_file.is_open()) {
-        throw runtime_error( "unable to create new cbr trace file " + trace_filename );
-    }
 
     if (bw.back() == 'M') {
         mbps = val;
@@ -239,6 +234,22 @@ void create_cbr_trace( string& bw, const string& trace_filename ) {
     } else {
         throw runtime_error( "invalid units for cbr trace, use K (Kbps) or M (Mbps)" );
     }
+
+    return mbps;
+}
+
+double bdp_bytes( double bw_mbps, double delay_ms ) {
+    return ((bw_mbps * 1000000) / 8) * (delay_ms / 1000);
+}
+
+void create_cbr_trace( string& bw, const string& trace_filename ) {
+
+    ofstream trace_file(trace_filename);
+    if (!trace_file.is_open()) {
+        throw runtime_error( "unable to create new cbr trace file " + trace_filename );
+    }
+
+    double mbps = str_to_mbps( bw );
 
     double ppms   = mbps / 12.0;
     int pps       = round(ppms * 1000.0);
