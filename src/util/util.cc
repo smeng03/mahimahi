@@ -239,7 +239,7 @@ double str_to_mbps( string& bw ) {
 }
 
 double bdp_bytes( double bw_mbps, double delay_ms ) {
-    return ((bw_mbps * 1000000) / 8) * (delay_ms / 1000);
+    return ((bw_mbps * 1000000) / 8) * ((delay_ms * 2) / 1000);
 }
 
 void create_cbr_trace( string& bw, const string& trace_filename ) {
