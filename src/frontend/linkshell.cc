@@ -24,6 +24,7 @@ void usage_error( const string & program_name )
     cerr << "          --meter-all" << endl;
     cerr << "          --uplink-queue=QUEUE_TYPE --downlink-queue=QUEUE_TYPE" << endl;
     cerr << "          --uplink-queue-args=QUEUE_ARGS --downlink-queue-args=QUEUE_ARGS" << endl;
+    cerr << "          --q=QUEUE_TYPE,QUEUE_ARGS" << endl;
     cerr << "          --cbr" << endl;
     cerr << "                (if --cbr is used, UPLINK-TRACE and DOWNLINK-TRACE should be desired bitrate" << endl;
     cerr << "                 rather than filename, expressed as \"XK\" for X Kbps or \"XM\" for X Mbps)" << endl;
@@ -103,6 +104,7 @@ int main( int argc, char *argv[] )
             { "downlink-queue",       required_argument, nullptr, 'w' },
             { "uplink-queue-args",    required_argument, nullptr, 'a' },
             { "downlink-queue-args",  required_argument, nullptr, 'b' },
+            { "both",                 optional_argument, nullptr, 'e' },     
             { "cbr",                        no_argument, nullptr, 'c' },
             { 0,                                      0, nullptr, 0 }
         };
@@ -160,6 +162,13 @@ int main( int argc, char *argv[] )
             case 'b':
                 downlink_queue_args = optarg;
                 break;
+            case 'e': { 
+                //const char *oa = optarg;
+                char *p = strchr(optarg, ',');
+                *p = '\0';
+                uplink_queue_type = downlink_queue_type = optarg;
+                uplink_queue_args = downlink_queue_args = (p+1);
+                break; }
             case 'c':
                 constant_bitrate_trace = true;
                 break;
