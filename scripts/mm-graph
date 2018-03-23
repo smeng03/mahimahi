@@ -89,12 +89,15 @@ if args.agg is not None:
             sys.exit(-1)
 
 if args.ports is not None:
-    try:
-        ports_to_track = parse_ports(args.ports)
-    except:
-        print "ERROR: error parsing port list."
-        parser.print_help()
-        sys.exit(-1)
+    if args.ports == "all":
+        ports_to_track = "all"
+    else:
+        try:
+            ports_to_track = parse_ports(args.ports)
+        except:
+            print "ERROR: error parsing port list."
+            parser.print_help()
+            sys.exit(-1)
 
 uplink = None
 if args.link_dir is not None:
@@ -248,21 +251,30 @@ dep_flows = flatten(map(lambda x : x.keys(), departures.values()))
 all_observed_flows = set(arr_flows + dep_flows)
 flows_to_track = []
 flow_to_name = {}
-for flow in all_observed_flows:
-    for port in ports_to_track:
-        if port in flow:
-            if not flow in flows_to_track:
-                flows_to_track.append(flow)
-            src,dst = flow.split(":")
-            port = flow
-            if src in ports_to_track:
-                if not dst in ports_to_track:
-                    port = src
-            else:
-                port = dst
-            name = known_ports[port] if port in known_ports else port
-            flow_to_name[flow] = name
-            break
+if ports_to_track == "all":
+    for flow in all_observed_flows:
+        if flow == "sum" or flow == "0:0":
+            continue
+        if not flow in flows_to_track:
+            flows_to_track.append(flow)
+        src,dst = flow.split(":")
+        flow_to_name[flow] = flow
+else:
+    for flow in all_observed_flows:
+        for port in ports_to_track:
+            if port in flow:
+                if not flow in flows_to_track:
+                    flows_to_track.append(flow)
+                src,dst = flow.split(":")
+                port = flow
+                if src in ports_to_track:
+                    if not dst in ports_to_track:
+                        port = src
+                else:
+                    port = dst
+                name = known_ports[port] if port in known_ports else port
+                flow_to_name[flow] = name
+                break
 
 ### print statistics
 duration = (last_t - first_t) / 1000.0
