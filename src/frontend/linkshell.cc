@@ -8,6 +8,7 @@
 #include "codel_packet_queue.hh"
 #include "pie_packet_queue.hh"
 #include "ecmp_packet_queue.hh"
+#include "fair_packet_queue.hh"
 #include "link_queue.hh"
 #include "packetshell.cc"
 #include "util.hh"
@@ -30,7 +31,7 @@ void usage_error( const string & program_name )
     cerr << "                (if --cbr is used, UPLINK-TRACE and DOWNLINK-TRACE should be desired bitrate" << endl;
     cerr << "                 rather than filename, expressed as \"XK\" for X Kbps or \"XM\" for X Mbps)" << endl;
     cerr << endl;
-    cerr << "          QUEUE_TYPE = infinite | droptail | drophead | codel | pie | ecmp" << endl;
+    cerr << "          QUEUE_TYPE = infinite | droptail | drophead | codel | pie | ecmp | akshayfq" << endl;
     cerr << "          QUEUE_ARGS = \"NAME=NUMBER[, NAME2=NUMBER2, ...]\"" << endl;
     cerr << "              (with NAME = bytes | packets | target | interval | qdelay_ref | max_burst)" << endl;
     cerr << "                  target, interval, qdelay_ref, max_burst are in milli-second" << endl << endl;
@@ -57,6 +58,8 @@ unique_ptr<AbstractPacketQueue> get_packet_queue( const string & type, const str
         return unique_ptr<AbstractPacketQueue>( new PIEPacketQueue( args ) );
     } else if ( type == "ecmp" ) {
         return unique_ptr<AbstractPacketQueue>( new ECMPPacketQueue( args ) );
+    } else if ( type == "akshayfq" ) {
+        return unique_ptr<AbstractPacketQueue>( new FairPacketQueue( args ) );
     } else {
         cerr << "Unknown queue type: " << type << endl;
     }
