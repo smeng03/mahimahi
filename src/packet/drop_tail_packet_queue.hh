@@ -26,6 +26,11 @@ public:
 
         assert( good() );
     }
+
+    QueuedPacket& peek( void ) {
+        return internal_queue_.front();
+    }
+
 };
 
 #endif /* DROP_TAIL_PACKET_QUEUE_HH */ 

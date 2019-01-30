@@ -7,6 +7,7 @@
 #include "drop_head_packet_queue.hh"
 #include "codel_packet_queue.hh"
 #include "pie_packet_queue.hh"
+#include "ecmp_packet_queue.hh"
 #include "link_queue.hh"
 #include "packetshell.cc"
 #include "util.hh"
@@ -29,10 +30,15 @@ void usage_error( const string & program_name )
     cerr << "                (if --cbr is used, UPLINK-TRACE and DOWNLINK-TRACE should be desired bitrate" << endl;
     cerr << "                 rather than filename, expressed as \"XK\" for X Kbps or \"XM\" for X Mbps)" << endl;
     cerr << endl;
-    cerr << "          QUEUE_TYPE = infinite | droptail | drophead | codel | pie" << endl;
+    cerr << "          QUEUE_TYPE = infinite | droptail | drophead | codel | pie | ecmp" << endl;
     cerr << "          QUEUE_ARGS = \"NAME=NUMBER[, NAME2=NUMBER2, ...]\"" << endl;
     cerr << "              (with NAME = bytes | packets | target | interval | qdelay_ref | max_burst)" << endl;
     cerr << "                  target, interval, qdelay_ref, max_burst are in milli-second" << endl << endl;
+    cerr << "           Additional QUEUE_ARGS for ECMP only:" << endl;
+    cerr << "             * queues            : number of internal queues" << endl;
+    cerr << "             * nonworkconserving : 0 = wc, 1 = not wc" << endl;
+    cerr << "             * seed              : seed for pRNG, only needed for delay jitter" << endl;
+    cerr << "             * mean_jitter       : mean of poisson process for calculating delay jitter, if 0, no jitter" << endl;
 
     throw runtime_error( "invalid arguments" );
 }
@@ -49,6 +55,8 @@ unique_ptr<AbstractPacketQueue> get_packet_queue( const string & type, const str
         return unique_ptr<AbstractPacketQueue>( new CODELPacketQueue( args ) );
     } else if ( type == "pie" ) {
         return unique_ptr<AbstractPacketQueue>( new PIEPacketQueue( args ) );
+    } else if ( type == "ecmp" ) {
+        return unique_ptr<AbstractPacketQueue>( new ECMPPacketQueue( args ) );
     } else {
         cerr << "Unknown queue type: " << type << endl;
     }

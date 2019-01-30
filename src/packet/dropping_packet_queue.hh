@@ -15,14 +15,14 @@ private:
     int queue_size_in_bytes_ = 0, queue_size_in_packets_ = 0;
     unsigned int bdp_byte_limit_;
 
-    std::queue<QueuedPacket> internal_queue_ {};
-
     virtual const std::string & type( void ) const = 0;
 
 protected:
     const unsigned int packet_limit_;
     const unsigned int byte_limit_;
     const unsigned int bdp_limit_;
+
+    std::queue<QueuedPacket> internal_queue_ {};
 
     /* put a packet on the back of the queue */
     void accept( QueuedPacket && p );

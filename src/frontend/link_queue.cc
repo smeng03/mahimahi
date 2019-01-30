@@ -140,10 +140,12 @@ void LinkQueue::record_departure( const uint64_t departure_time, const QueuedPac
 {
     /* log the delivery */
     if ( log_ ) {
-			uint16_t src, dst;
+			uint16_t src=0, dst=0;
 			// unsigned int queue_bytes   = packet_queue_->size_bytes();
 			// unsigned int queue_packets = packet_queue_->size_packets();
-			_parse_ports((const unsigned char *) packet.contents.substr(24,4).c_str(), &src, &dst);
+            if (packet.contents.size() >= 28) {
+                _parse_ports((const unsigned char *) packet.contents.substr(24,4).c_str(), &src, &dst);
+            }
 			*log_ << departure_time << " - " << packet.contents.size()
 						<< " " << src << ":" << dst
 						<< " " << departure_time - packet.arrival_time << endl;
@@ -228,6 +230,9 @@ void LinkQueue::rationalize( const uint64_t now )
                 }
                 packet_in_transit_ = packet_queue_->dequeue();
                 packet_in_transit_bytes_left_ = packet_in_transit_.contents.size();
+                if (packet_in_transit_bytes_left_ == 0) {
+                    break;
+                }
             }
 
             assert( packet_in_transit_.arrival_time <= this_delivery_time );
