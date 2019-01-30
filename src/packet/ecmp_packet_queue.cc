@@ -47,11 +47,34 @@ inline uint32_t simple_hash(const char *str, size_t len) {
     return hash; 
 }
 
+typedef uint64_t Fnv64_t;
+/*
+ * 64 bit magic FNV-0 and FNV-1 prime
+ */
+#define FNV1_64_INIT ((Fnv64_t)0xcbf29ce484222325ULL)
+#define FNV_64_PRIME ((Fnv64_t)0x100000001b3ULL)
+
+Fnv64_t
+fnv_64_buf(const void *buf, size_t len, Fnv64_t hval)
+{
+    size_t i;
+    uint64_t v;
+    uint8_t *b = (uint8_t*) buf;
+    for (i = 0; i < len; i++) {
+        v = (uint64_t) b[i];
+        hval = hval ^ v;
+        hval *= FNV_64_PRIME;
+    }
+
+    return hval;
+}
+
 #define FIVE_TUPLE_START 24
 #define FIVE_TUPLE_LEN 4
 
 inline size_t hash_flow(const char *pkt) {
-    return simple_hash(pkt, FIVE_TUPLE_LEN);
+    //return simple_hash(pkt, FIVE_TUPLE_LEN);
+    return fnv_64_buf(pkt, FIVE_TUPLE_LEN, FNV1_64_INIT);
 }
 
 void ECMPPacketQueue::enqueue(QueuedPacket &&p ) {
