@@ -569,6 +569,12 @@ if args.fake is None or not args.fake:
     outf.flush()
     outf.close()
     os.remove(TMP_FILE)
-    os.system("epstopdf " + outfname)
+    import platform
+    p = platform.platform().split("-")[0]
+    if p == 'Darwin'
+        os.system("epstopdf " + outfname)
     if not args.no_display:
-	os.system("open " + outfname)
+        if p == 'Darwin':
+            os.system("open " + outfname)
+        else:
+            os.system("evince " + outfname)
