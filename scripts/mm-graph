@@ -45,6 +45,7 @@ parser.add_argument('--delay-f',type=str,help="how to calculate delay over each 
 
 parser.add_argument('--nimbus',type=str,help='path to nimbus output file, adds red boxes for incorrect mode to plot')
 parser.add_argument('--ports',type=str,help="comma-separated list of ports to identify flows. denote portranges with colons, e.g. 1000:1002 is equivalent to 1000,1001,1002")
+parser.add_argument('--plot-direction',type=str,help="(ingress|egress), plot incoming or outgoing traffic, default=egress", default="egress")
 
 args = parser.parse_args()
 
@@ -71,22 +72,26 @@ if args.agg is not None and args.ports is not None:
 
 if args.agg is not None:
     if not os.path.exists(args.agg):
-        print "ERROR: could not find aggregate flow list: " + args.agg
+        #print "ERROR: could not find aggregate flow list: " + args.agg
+        #parser.print_help()
+        #sys.exit(-1)
+        ls = args.agg.split(",")
+    else:
+        f = open(args.agg)
+        ls = f.readlines()
+        f.close()
+    try:
+        for l in ls:
+            p, name = l.strip().split("=")
+            ports = parse_ports(p)
+            for port in ports:
+                agg_ports[port] = name
+                if not name in agg_names:
+                    agg_names.append(name)
+    except:
+        print "ERROR: error parsing aggregate flow list. format is: [portlist]=[key name]"
         parser.print_help()
         sys.exit(-1)
-    with open(args.agg) as f:
-        try:
-            for l in f:
-                p, name = l.strip().split("\t")
-                ports = parse_ports(p)
-                for port in ports:
-                    agg_ports[port] = name
-                    if not name in agg_names:
-                        agg_names.append(name)
-        except:
-            print "ERROR: error parsing aggregate flow list. format is: [portlist]\\t[key name]"
-            parser.print_help()
-            sys.exit(-1)
 
 if args.ports is not None:
     if args.ports == "all":
@@ -342,27 +347,55 @@ elif "%" in args.delay_f:
 
 TMP_FILE = '/tmp/mm-graph.tmp'
 with open(TMP_FILE, 'w') as f:
+    # write header
+    f.write("t total delay")
+    if flows_to_track:
+        for flow in flows_to_track:
+            f.write(" " + flow)
+    if agg_names:
+        for agg in agg_names:
+            f.write(" " + agg)
+    f.write("\n")
+
     current_buf_bytes = 0
-    for tbin in range(first_bin, last_bin+1):
-        t = bin_to_seconds( tbin )
 
-        dep_t = bits_to_mbps(departures[tbin]['sum']) if tbin in departures else 0
-        del_t = delay_f(delays[tbin]) if tbin in delays else 0
+    if args.plot_direction == "egress":
+        for tbin in range(first_bin, last_bin+1):
+            t = bin_to_seconds( tbin )
 
-        f.write("{} {} {}".format(t, dep_t, del_t))
+            dep_t = bits_to_mbps(departures[tbin]['sum']) if tbin in departures else 0
+            del_t = delay_f(delays[tbin]) if tbin in delays else 0
 
-        if flows_to_track:
-            for flow in flows_to_track:
-                f.write(" {}".format(bits_to_mbps(departures[tbin][flow]) if tbin in departures else 0))
-        if agg_names:
-            for agg in agg_names:
-                f.write(" {}".format(bits_to_mbps(departures[tbin][agg]) if tbin in departures else 0))
-        f.write("\n")
-        #cap_t = bits_to_mbps(capacity[tbin]) if tbin in capacity else 0
-        #arr_t = bits_to_mbps(arrivals[tbin]['sum']) if tbin in arrivals else 0
-        #current_buf_bytes += (arrivals[tbin]['sum'] if tbin in arrivals else 0)
-        #current_buf_bytes -= (departures[tbin]['sum'] if tbin in departures else 0)
-        #print t, cap_t, arr_t, dep_t, current_buf_bytes
+            f.write("{} {} {}".format(t, dep_t, del_t))
+
+            if flows_to_track:
+                for flow in flows_to_track:
+                    f.write(" {}".format(bits_to_mbps(departures[tbin][flow]) if tbin in departures else 0))
+            if agg_names:
+                for agg in agg_names:
+                    f.write(" {}".format(bits_to_mbps(departures[tbin][agg]) if tbin in departures else 0))
+            f.write("\n")
+            #cap_t = bits_to_mbps(capacity[tbin]) if tbin in capacity else 0
+            #arr_t = bits_to_mbps(arrivals[tbin]['sum']) if tbin in arrivals else 0
+            #current_buf_bytes += (arrivals[tbin]['sum'] if tbin in arrivals else 0)
+            #current_buf_bytes -= (departures[tbin]['sum'] if tbin in departures else 0)
+            #print t, cap_t, arr_t, dep_t, current_buf_bytes
+    else:
+        for tbin in range(first_bin, last_bin+1):
+            t = bin_to_seconds( tbin )
+
+            arr_t = bits_to_mbps(arrivals[tbin]['sum']) if tbin in arrivals else 0
+            del_t = delay_f(delays[tbin]) if tbin in delays else 0
+
+            f.write("{} {} {}".format(t, arr_t, del_t))
+
+            if flows_to_track:
+                for flow in flows_to_track:
+                    f.write(" {}".format(bits_to_mbps(arrivals[tbin][flow]) if tbin in arrivals else 0))
+            if agg_names:
+                for agg in agg_names:
+                    f.write(" {}".format(bits_to_mbps(arrivals[tbin][agg]) if tbin in arrivals else 0))
+            f.write("\n")
 ### 
 
 ### make plot a
@@ -571,7 +604,7 @@ if args.fake is None or not args.fake:
     os.remove(TMP_FILE)
     import platform
     p = platform.platform().split("-")[0]
-    if p == 'Darwin'
+    if p == 'Darwin':
         os.system("epstopdf " + outfname)
     if not args.no_display:
         if p == 'Darwin':
